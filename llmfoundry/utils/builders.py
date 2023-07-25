@@ -27,6 +27,14 @@ from llmfoundry.callbacks import (FDiffMetrics, Generate, GlobalLRScaling,
 from llmfoundry.optim import (DecoupledAdaLRLion, DecoupledClipLion,
                               DecoupledLionW)
 
+try:
+    from llmfoundry.utils.make_llama_work_with_autoclass import make_llama_work
+    make_llama_work()
+except ImportError:
+    import warnings
+    warnings.warn('Couldn\'t make Llama/Custom SentencePiece tokenizers work' +
+                  ' (this is expected if you\'re not using them).')
+
 Tokenizer = Union[PreTrainedTokenizer, PreTrainedTokenizerFast]
 
 

@@ -9,6 +9,8 @@ try:
     from llmfoundry.utils.config_utils import (calculate_batch_size_info,
                                                log_config,
                                                update_batch_size_info)
+    from llmfoundry.utils.make_llama_work_with_autoclass import make_llama_work
+    
 except ImportError as e:
     raise ImportError(
         'Please make sure to pip install . to get requirements for llm-foundry.'
@@ -25,4 +27,5 @@ __all__ = [
     'calculate_batch_size_info',
     'update_batch_size_info',
     'log_config',
+    'make_llama_work'
 ]
