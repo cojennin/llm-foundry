@@ -146,7 +146,7 @@ def get_hf_tokenizer_from_composer_state_dict(
                     with open(tokenizer_file_path, 'wb') as _tmp_file:
                         _tmp_file.write(s.serialized_model_proto())
             tokenizer_args = {
-              'use_slow': args.slow_tokenizer
+              'use_slow': True
             }
             hf_tokenizer = AutoTokenizer.from_pretrained(_tmp_dir, **tokenizer_args)
 
@@ -295,7 +295,6 @@ def parse_args() -> Namespace:
                         default='fp32')
     parser.add_argument('--hf_repo_for_upload', type=str, default=None)
     parser.add_argument('--test_uploaded_model', action='store_true')
-    parser.add_argument('--slow_tokenizer', type=bool, default=False)
 
     return parser.parse_args()
 
@@ -334,7 +333,7 @@ def convert_composer_to_hf(args: Namespace) -> None:
 
     print(f'Loading tokenizer from {local_folder_path}')
     tokenizer_args = {
-        'use_slow': args.slow_tokenizer
+        'use_slow': True
     }
     
     tokenizer = transformers.AutoTokenizer.from_pretrained(local_folder_path, **tokenizer_args)
