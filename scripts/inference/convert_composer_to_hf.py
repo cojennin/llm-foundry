@@ -145,7 +145,10 @@ def get_hf_tokenizer_from_composer_state_dict(
                     s.load_from_serialized_proto(saved_content['content'])
                     with open(tokenizer_file_path, 'wb') as _tmp_file:
                         _tmp_file.write(s.serialized_model_proto())
-            hf_tokenizer = AutoTokenizer.from_pretrained(_tmp_dir)
+            tokenizer_args = {
+              'use_slow': args.slow_tokenizer
+            }
+            hf_tokenizer = AutoTokenizer.from_pretrained(_tmp_dir, **tokenizer_args)
 
             # remove 'name_or_path'
             hf_tokenizer.name_or_path = ''
