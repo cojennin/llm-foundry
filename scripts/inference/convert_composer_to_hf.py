@@ -292,6 +292,7 @@ def parse_args() -> Namespace:
                         default='fp32')
     parser.add_argument('--hf_repo_for_upload', type=str, default=None)
     parser.add_argument('--test_uploaded_model', action='store_true')
+    parser.add_argument('--slow_tokenizer', type=bool, default=False)
 
     return parser.parse_args()
 
@@ -329,7 +330,11 @@ def convert_composer_to_hf(args: Namespace) -> None:
     loaded_hf_model.save_pretrained(local_folder_path)
 
     print(f'Loading tokenizer from {local_folder_path}')
-    tokenizer = transformers.AutoTokenizer.from_pretrained(local_folder_path)
+    tokenizer_args = {
+        'use_slow': args.slow_tokenizer
+    }
+    
+    tokenizer = transformers.AutoTokenizer.from_pretrained(local_folder_path, **tokenizer_args)
     tokenizer.save_pretrained(local_folder_path)
 
     print('Editing files for HF compatibility...')
