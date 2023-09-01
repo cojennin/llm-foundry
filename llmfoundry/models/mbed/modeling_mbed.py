@@ -14,10 +14,9 @@ import warnings
 from typing import Any, List, Optional, Tuple, Union
 
 import torch
-import torch.nn as nns
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
-from composer.metrics.nlp import (BinaryF1Score, LanguageCrossEntropy,
-                                  MaskedAccuracy)
+from torch import nn
+from transformers import PreTrainedModel
+from composer.metrics.nlp import (LanguageCrossEntropy)
 from composer.models.huggingface import HuggingFaceModel
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
@@ -40,26 +39,10 @@ Tokenizer = Union[PreTrainedTokenizer, PreTrainedTokenizerFast]
 class MBed(PreTrainedModel):
     
     def __init__(self, config: MPTConfig):
+        super().__init__(config)
+        
         self.bert = BertModel(config, add_pooling_layer=True)
         
-    def forward(
-        self,
-        input_ids: torch.Tensor,
-        token_type_ids: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.Tensor] = None,
-        masked_tokens_mask: Optional[torch.Tensor] = None,
-    ) -> Tuple[Union[List[torch.Tensor], torch.Tensor], Optional[torch.Tensor]]:
-
-        (encoder_outputs, pooled_outputs) = self.bert (
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            masked_tokens_mask=masked_tokens_mask,
-        )
-        
-        return pooled_outputs
 
 class ComposerMBed(HuggingFaceModel):
     """Mosaic MBed model based on |:hugging_face:| Transformers."""
@@ -81,7 +64,30 @@ class ComposerMBed(HuggingFaceModel):
         config = BertConfig.from_pretrained(pretrained_model_name,
                                             **resolved_om_model_config)
         
-        model = MBed(config, add_pooling_layer=True)
+        model = BertModel(config, add_pooling_layer=True)
+        
+        loss_fn_config = om_model_config.get('loss_fn', 'fused_crossentropy')
+        if loss_fn_config == 'fused_crossentropy':
+            try:
+                from flash_attn.losses.cross_entropy import CrossEntropyLoss as FusedCrossEntropyLoss  # type: ignore # isort: skip
+
+                if config.verbose > 1:
+                    warnings.warn('Using Fused Cross Entropy Loss.')
+                self.loss_fn = FusedCrossEntropyLoss(ignore_index=-100)
+            except:
+                raise ValueError(
+                    'Fused Cross Entropy is not installed. Either (1) have a CUDA-compatible GPU '
+                    +
+                    'and `pip install .[gpu]` if installing from source or `pip install xentropy-cuda-lib@git+https://github.com/HazyResearch/flash-attention.git@v1.0.3#subdirectory=csrc/xentropy` '
+                    +
+                    'if installing from pypi, or (2) set your config model.loss_fn=torch_crossentropy.'
+                )
+        elif loss_fn_config == 'torch_crossentropy':
+            self.loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
+        else:
+            raise ValueError(
+                f'Specified loss_fn={self.loss_fn} not recognized. `loss_fn` must be one of [`fused_crossentropy`, `torch_crossentropy`].'
+            )
         
         metrics = [
             LanguageCrossEntropy(ignore_index=-100),
@@ -92,4 +98,25 @@ class ComposerMBed(HuggingFaceModel):
                          use_logits=True,
                          metrics=metrics)
         
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        token_type_ids: Optional[torch.Tensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.Tensor] = None,
+        masked_tokens_mask: Optional[torch.Tensor] = None,
+    ) -> Tuple[Union[List[torch.Tensor], torch.Tensor], Optional[torch.Tensor]]:
+
+        (encoder_outputs, pooled_outputs) = self.model(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            masked_tokens_mask=masked_tokens_mask,
+        )
+        
+        return pooled_outputs
     
+    def loss(self, outputs, batch):
+        _, targets = batch
+        return self.loss_fn(outputs, targets)

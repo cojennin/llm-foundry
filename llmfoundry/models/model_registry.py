@@ -8,6 +8,7 @@ from llmfoundry.models.hf import (ComposerHFBertForMaskedLM,
 from llmfoundry.models.mosaicbert import (
     ComposerMosaicBertForMaskedLM, ComposerMosaicBertForSequenceClassification)
 from llmfoundry.models.mpt import ComposerMPTCausalLM
+from llmfoundry.models.mbed.modeling_mbed import ComposerMBed
 
 COMPOSER_MODEL_REGISTRY = {
     'mpt_causal_lm':
@@ -18,6 +19,8 @@ COMPOSER_MODEL_REGISTRY = {
         ComposerHFPrefixLM,
     'hf_t5':
         ComposerHFT5,
+    'mbed':
+        ComposerMBed,
     'mosaicbert_masked_lm':
         ComposerMosaicBertForMaskedLM,
     'mosaicbert_sequence_classification':
