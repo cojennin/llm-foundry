@@ -41,6 +41,19 @@ logger = logging.getLogger(__name__)
 
 Tokenizer = Union[PreTrainedTokenizer, PreTrainedTokenizerFast]
 
+# Todo: does this exist somewhere? Move this to a util?
+def dist_gather_tensor(t: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
+    if t is None:
+        return None
+
+    t = t.contiguous()
+    all_tensors = [torch.empty_like(t) for _ in range(dist.get_world_size())]
+    torch.distributed.all_gather(all_tensors, t)
+
+    all_tensors[dist.get_global_rank()] = t
+    all_tensors = torch.cat(all_tensors, dim=0)
+    return all_tensors
+
 # Inspiration from: https://github.com/microsoft/unilm/blob/b60c741f746877293bb85eed6806736fc8fa0ffd/simlm/src/models/biencoder_model.py#L103
 class ComposerMBed(HuggingFaceModel):
     """Mosaic MBed model based on |:hugging_face:| Transformers."""
@@ -64,14 +77,12 @@ class ComposerMBed(HuggingFaceModel):
         
         model = BertModel(config, add_pooling_layer=True)
         
-        metrics = [
-            LanguageCrossEntropy(ignore_index=-100),
-        ]
+        # metrics = [
+        #     LanguageCrossEntropy(ignore_index=-100),
+        # ]
         
         super().__init__(model=model,
-                         tokenizer=tokenizer,
-                         use_logits=True,
-                         metrics=metrics)
+                         tokenizer=tokenizer)
 
     def forward(self, batch):
         scores, labels = self._compute_scores(batch)
@@ -81,7 +92,8 @@ class ComposerMBed(HuggingFaceModel):
         loss = loss_fct(scores, labels)
         
         return {
-            'loss': loss
+            'loss': loss,
+            'logits': labels
         }
         
     def _compute_scores(self, batch) -> Tuple:
@@ -97,13 +109,13 @@ class ComposerMBed(HuggingFaceModel):
         
         pooled_outputs = pooled_outputs.contiguous() # Why do we need to make this contiguous?
 
-        all_pooled_outputs = torch.cat(dist.all_gather(pooled_outputs), dim=0)
+        all_pooled_outputs = dist_gather_tensor(pooled_outputs)
         
         all_scores, all_labels = self.full_contrastive_scores_and_labels(all_pooled_outputs)
         
-        scale = 1 / 0.2 # Todo: should be configurable when L2 normalizing, 0.2 should be a temperature arugment
+        # scale = 1 / 0.2 # Todo: should be configurable when L2 normalizing, 0.2 should be a temperature arugment
         
-        all_scores = all_scores * scale
+        # all_scores = all_scores * scale
         
         start = dist.get_global_rank() * all_pooled_outputs.shape[0]
         
