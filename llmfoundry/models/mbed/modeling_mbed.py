@@ -14,9 +14,15 @@ import warnings
 from typing import Any, List, Optional, Tuple, Union
 
 import torch
-from torch import nn
-from transformers import PreTrainedModel
-from composer.metrics.nlp import (LanguageCrossEntropy)
+import torch.nn as nns
+from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from composer.metrics.nlp import (BinaryF1Score, LanguageCrossEntropy,
+                                  MaskedAccuracy)
+import torch.nn as nn
+import torch.nn.functional as F
+
+from composer.utils import dist
+
 from composer.models.huggingface import HuggingFaceModel
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
@@ -35,15 +41,7 @@ logger = logging.getLogger(__name__)
 
 Tokenizer = Union[PreTrainedTokenizer, PreTrainedTokenizerFast]
 
-
-class MBed(PreTrainedModel):
-    
-    def __init__(self, config: MPTConfig):
-        super().__init__(config)
-        
-        self.bert = BertModel(config, add_pooling_layer=True)
-        
-
+# Inspiration from: https://github.com/microsoft/unilm/blob/b60c741f746877293bb85eed6806736fc8fa0ffd/simlm/src/models/biencoder_model.py#L103
 class ComposerMBed(HuggingFaceModel):
     """Mosaic MBed model based on |:hugging_face:| Transformers."""
 
@@ -66,29 +64,6 @@ class ComposerMBed(HuggingFaceModel):
         
         model = BertModel(config, add_pooling_layer=True)
         
-        loss_fn_config = om_model_config.get('loss_fn', 'fused_crossentropy')
-        if loss_fn_config == 'fused_crossentropy':
-            try:
-                from flash_attn.losses.cross_entropy import CrossEntropyLoss as FusedCrossEntropyLoss  # type: ignore # isort: skip
-
-                if config.verbose > 1:
-                    warnings.warn('Using Fused Cross Entropy Loss.')
-                self.loss_fn = FusedCrossEntropyLoss(ignore_index=-100)
-            except:
-                raise ValueError(
-                    'Fused Cross Entropy is not installed. Either (1) have a CUDA-compatible GPU '
-                    +
-                    'and `pip install .[gpu]` if installing from source or `pip install xentropy-cuda-lib@git+https://github.com/HazyResearch/flash-attention.git@v1.0.3#subdirectory=csrc/xentropy` '
-                    +
-                    'if installing from pypi, or (2) set your config model.loss_fn=torch_crossentropy.'
-                )
-        elif loss_fn_config == 'torch_crossentropy':
-            self.loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
-        else:
-            raise ValueError(
-                f'Specified loss_fn={self.loss_fn} not recognized. `loss_fn` must be one of [`fused_crossentropy`, `torch_crossentropy`].'
-            )
-        
         metrics = [
             LanguageCrossEntropy(ignore_index=-100),
         ]
@@ -97,26 +72,52 @@ class ComposerMBed(HuggingFaceModel):
                          tokenizer=tokenizer,
                          use_logits=True,
                          metrics=metrics)
-        
-    def forward(
-        self,
-        input_ids: torch.Tensor,
-        token_type_ids: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.Tensor] = None,
-        masked_tokens_mask: Optional[torch.Tensor] = None,
-    ) -> Tuple[Union[List[torch.Tensor], torch.Tensor], Optional[torch.Tensor]]:
 
-        (encoder_outputs, pooled_outputs) = self.model(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            masked_tokens_mask=masked_tokens_mask,
+    def forward(self, batch):
+        scores, labels = self._compute_scores(batch)
+        
+        loss_fct = nn.CrossEntropyLoss()
+        
+        loss = loss_fct(scores, labels)
+        
+        return {
+            'loss': loss
+        }
+        
+    def _compute_scores(self, batch) -> Tuple:
+        (_, pooled_outputs) = self.model(
+            input_ids=batch['input_ids'],
+            token_type_ids=batch.get('token_type_ids', None),
+            attention_mask=batch.get('attention_mask', None),
+            position_ids=batch.get('position_ids', None),
+            masked_tokens_mask=batch.get('masked_tokens_mask', None),
         )
         
-        return pooled_outputs
-    
-    def loss(self, outputs, batch):
-        _, targets = batch
-        return self.loss_fn(outputs, targets)
+        pooled_outputs = F.normalize(pooled_outputs, dim=-1) # Todo: should be configurable when L2 normalizing
+        
+        pooled_outputs = pooled_outputs.contiguous() # Why do we need to make this contiguous?
+
+        all_pooled_outputs = torch.cat(dist.all_gather(pooled_outputs), dim=0)
+        
+        all_scores, all_labels = self.full_contrastive_scores_and_labels(all_pooled_outputs)
+        
+        scale = 1 / 0.2 # Todo: should be configurable when L2 normalizing, 0.2 should be a temperature arugment
+        
+        all_scores = all_scores * scale
+        
+        start = dist.get_global_rank() * all_pooled_outputs.shape[0]
+        
+        local_query_indices = torch.arange(start, start + pooled_outputs.shape[0], dtype=torch.long).to(pooled_outputs.device)
+        
+        scores = all_scores.index_select(dim=0, index=local_query_indices)
+        labels = all_labels.index_select(dim=0, index=local_query_indices)
+
+        return scores, labels
+
+    def full_contrastive_scores_and_labels(self, passages: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+
+        labels = torch.arange(0, passages.shape[0], dtype=torch.long, device=passages.device)
+
+        qk = torch.mm(passages, passages.t())
+
+        return qk, labels
