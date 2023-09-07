@@ -97,39 +97,65 @@ class ComposerMBed(HuggingFaceModel):
         }
         
     def _compute_scores(self, batch) -> Tuple:
-        (_, pooled_outputs) = self.model(
-            input_ids=batch['input_ids'],
-            token_type_ids=batch.get('token_type_ids', None),
-            attention_mask=batch.get('attention_mask', None),
-            position_ids=batch.get('position_ids', None),
-            masked_tokens_mask=batch.get('masked_tokens_mask', None),
-        )
-        
-        pooled_outputs = F.normalize(pooled_outputs, dim=-1) # Todo: should be configurable when L2 normalizing
-        
-        pooled_outputs = pooled_outputs.contiguous() # Why do we need to make this contiguous?
 
-        all_pooled_outputs = dist_gather_tensor(pooled_outputs)
+        # Run Pairs through the encoder separately in two passes, designated as q (query) and p (passage)
+        # [batch_size, sequence_length]
+        #
+        # the pooled_outputs is [batch_size, hidden_size]
+        queries = batch['input_ids'][0::2,:]
+        passages = batch['input_ids'][1::2,:]
+
+        (_, q_pooled_outputs) = self.model(
+                                        input_ids=queries,
+                                        token_type_ids=batch.get('token_type_ids', None),
+                                        attention_mask=batch.get('attention_mask', None),
+                                        position_ids=batch.get('position_ids', None),
+                                        masked_tokens_mask=batch.get('masked_tokens_mask', None),
+                                    )
+
+        (_, p_pooled_outputs) = self.model(
+                                        input_ids=passages,
+                                        token_type_ids=batch.get('token_type_ids', None),
+                                        attention_mask=batch.get('attention_mask', None),
+                                        position_ids=batch.get('position_ids', None),
+                                        masked_tokens_mask=batch.get('masked_tokens_mask', None),
+                                    )
+
+        print('>>p_pooled_outputs shape:',p_pooled_outputs.shape)
         
-        all_scores, all_labels = self.full_contrastive_scores_and_labels(all_pooled_outputs)
+        q_pooled_outputs = F.normalize(q_pooled_outputs, dim=-1) # Todo: should be configurable when L2 normalizing
+        p_pooled_outputs = F.normalize(p_pooled_outputs, dim=-1)
+
+        q_pooled_outputs = q_pooled_outputs.contiguous() # Why do we need to make this contiguous?
+        p_pooled_outputs = p_pooled_outputs.contiguous() # Why do we need to make this contiguous?
+
+        all_q_pooled_outputs = dist_gather_tensor(q_pooled_outputs)
+        all_p_pooled_outputs = dist_gather_tensor(p_pooled_outputs)
+        
+        all_scores, all_labels = self.full_contrastive_scores_and_labels(queries=all_q_pooled_outputs, 
+                                                                         passages=all_p_pooled_outputs)
         
         # scale = 1 / 0.2 # Todo: should be configurable when L2 normalizing, 0.2 should be a temperature arugment
         
         # all_scores = all_scores * scale
         
-        start = dist.get_global_rank() * all_pooled_outputs.shape[0]
+        start = dist.get_global_rank() * all_q_pooled_outputs.shape[0]
         
-        local_query_indices = torch.arange(start, start + pooled_outputs.shape[0], dtype=torch.long).to(pooled_outputs.device)
+        local_query_indices = torch.arange(start, start + q_pooled_outputs.shape[0], dtype=torch.long).to(q_pooled_outputs.device)
         
         scores = all_scores.index_select(dim=0, index=local_query_indices)
         labels = all_labels.index_select(dim=0, index=local_query_indices)
 
         return scores, labels
 
-    def full_contrastive_scores_and_labels(self, passages: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def full_contrastive_scores_and_labels(self, queries: torch.Tensor, passages: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
 
+        # the labels 
         labels = torch.arange(0, passages.shape[0], dtype=torch.long, device=passages.device)
 
-        qk = torch.mm(passages, passages.t())
+        # this calculates the inner product between query and passage pairs
+        qp = torch.mm(queries, passages.t())
 
-        return qk, labels
+        print('>> qp shape:', qp.shape)
+
+        return qp, labels
