@@ -32,6 +32,7 @@ from llmfoundry.models.mosaicbert.configuration_mosaicbert import BertConfig
 from llmfoundry.models.mpt.configuration_mpt import MPTConfig
 
 from llmfoundry.models.utils.bert_padding import index_put_first_axis
+from llmfoundry.models.layers.mosaicbert_layers import BertLayer
 
 all = [
     'ComposerMBed'
@@ -95,6 +96,10 @@ class ComposerMBed(HuggingFaceModel):
             'loss': loss,
             'logits': labels
         }
+
+    # FSDP Wrap function
+    def fsdp_wrap_fn(self, module: nn.Module):
+        return isinstance(module, BertLayer)
         
     def _compute_scores(self, batch) -> Tuple:
 
@@ -102,6 +107,10 @@ class ComposerMBed(HuggingFaceModel):
         # [batch_size, sequence_length]
         #
         # the pooled_outputs is [batch_size, hidden_size]
+        #
+        # Note: at some future point we could use the flag 'token_type_ids' which was used in the original
+        # BERT formula to keep track of sentences A and sentences B in the next sentence prediction objective
+        # function. For now we split even and odd rows
         queries = batch['input_ids'][0::2,:]
         passages = batch['input_ids'][1::2,:]
 
@@ -121,7 +130,7 @@ class ComposerMBed(HuggingFaceModel):
                                         masked_tokens_mask=batch.get('masked_tokens_mask', None),
                                     )
 
-        print('>>p_pooled_outputs shape:',p_pooled_outputs.shape)
+        #print('>>p_pooled_outputs shape:',p_pooled_outputs.shape)
         
         q_pooled_outputs = F.normalize(q_pooled_outputs, dim=-1) # Todo: should be configurable when L2 normalizing
         p_pooled_outputs = F.normalize(p_pooled_outputs, dim=-1)
@@ -156,6 +165,6 @@ class ComposerMBed(HuggingFaceModel):
         # this calculates the inner product between query and passage pairs
         qp = torch.mm(queries, passages.t())
 
-        print('>> qp shape:', qp.shape)
+        #print('>> qp shape:', qp.shape)
 
         return qp, labels
