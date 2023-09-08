@@ -78,16 +78,18 @@ class ComposerMBed(HuggingFaceModel):
         
         model = BertModel(config, add_pooling_layer=True)
         
-        metrics = [
-            LanguageCrossEntropy(ignore_index=-100),
-        ]
+        # metrics = [
+        #     LanguageCrossEntropy(ignore_index=-100),
+        # ]
         
         super().__init__(model=model,
-                         tokenizer=tokenizer,
-                         metrics=metrics)
+                         tokenizer=tokenizer)
+                         #use_logits=True,
+                         #metrics=metrics)
 
     def forward(self, batch):
         scores, labels = self._compute_scores(batch)
+        #self.labels = labels # added for eval, doesn't work
         
         loss_fct = nn.CrossEntropyLoss()
         
@@ -95,7 +97,7 @@ class ComposerMBed(HuggingFaceModel):
         
         return {
             'loss': loss,
-            'logits': labels # shouldn't this be scores @cojennin?
+            'logits': scores # shouldn't this be scores @cojennin?
         }
 
     # FSDP Wrap function
@@ -161,7 +163,7 @@ class ComposerMBed(HuggingFaceModel):
         
         scores = all_scores.index_select(dim=0, index=local_query_indices)
         labels = all_labels.index_select(dim=0, index=local_query_indices)
-
+        #print('>>labels',labels.shape) # should be torch.Size([64])
         return scores, labels
 
     def full_contrastive_scores_and_labels(self, queries: torch.Tensor, passages: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
