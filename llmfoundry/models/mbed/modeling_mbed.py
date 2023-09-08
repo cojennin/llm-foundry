@@ -152,7 +152,9 @@ class ComposerMBed(HuggingFaceModel):
         
         # all_scores = all_scores * scale
         
-        start = dist.get_global_rank() * all_q_pooled_outputs.shape[0]
+        start = dist.get_global_rank() * q_pooled_outputs.shape[0]
+        # start = all_q_pooled_outputs.shape[0]
+        # start = 0
         
         local_query_indices = torch.arange(start, start + q_pooled_outputs.shape[0], dtype=torch.long).to(q_pooled_outputs.device)
         
