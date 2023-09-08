@@ -111,8 +111,8 @@ class ComposerMBed(HuggingFaceModel):
         # Note: at some future point we could use the flag 'token_type_ids' which was used in the original
         # BERT formula to keep track of sentences A and sentences B in the next sentence prediction objective
         # function. For now we split even and odd rows
-        queries = batch['input_ids'][0::2,:]
-        passages = batch['input_ids'][1::2,:]
+        queries = batch['input_ids']#[0::2,:]
+        passages = batch['input_ids']#[1::2,:]
 
         (_, q_pooled_outputs) = self.model(
                                         input_ids=queries,
