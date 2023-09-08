@@ -78,12 +78,13 @@ class ComposerMBed(HuggingFaceModel):
         
         model = BertModel(config, add_pooling_layer=True)
         
-        # metrics = [
-        #     LanguageCrossEntropy(ignore_index=-100),
-        # ]
+        metrics = [
+            LanguageCrossEntropy(ignore_index=-100),
+        ]
         
         super().__init__(model=model,
-                         tokenizer=tokenizer)
+                         tokenizer=tokenizer,
+                         metrics=metrics)
 
     def forward(self, batch):
         scores, labels = self._compute_scores(batch)
@@ -94,7 +95,7 @@ class ComposerMBed(HuggingFaceModel):
         
         return {
             'loss': loss,
-            'logits': labels
+            'logits': labels # shouldn't this be scores @cojennin?
         }
 
     # FSDP Wrap function
