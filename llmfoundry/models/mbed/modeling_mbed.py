@@ -100,6 +100,10 @@ class ComposerMBed(HuggingFaceModel):
     # FSDP Wrap function
     def fsdp_wrap_fn(self, module: nn.Module):
         return isinstance(module, BertLayer)
+
+    # Activation Checkpointing
+    def activation_checkpointing_fn(self, module: nn.Module):
+        return isinstance(module, BertLayer)
         
     def _compute_scores(self, batch) -> Tuple:
 
