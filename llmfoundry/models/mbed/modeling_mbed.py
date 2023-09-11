@@ -70,6 +70,8 @@ class ComposerMBed(HuggingFaceModel):
         
         pretrained_model_name = resolved_om_model_config.get(
             'pretrained_model_name')
+        
+        self.temperature = resolved_om_model_config.get('temperature', 1)
 
         if not pretrained_model_name:
             pretrained_model_name = 'bert-base-uncased'
@@ -168,7 +170,7 @@ class ComposerMBed(HuggingFaceModel):
         all_scores, all_labels = self.full_contrastive_scores_and_labels(queries=all_q_pooled_outputs, 
                                                                          passages=all_p_pooled_outputs)
         
-        scale = 1 / 0.2 # Todo: should be configurable when L2 normalizing, 0.2 should be a temperature arugment
+        scale = 1 / self.temperature # Todo: should be configurable when L2 normalizing, 0.2 should be a temperature arugment
         
         all_scores = all_scores * scale
         
