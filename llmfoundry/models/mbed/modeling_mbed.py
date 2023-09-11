@@ -55,11 +55,6 @@ def dist_gather_tensor(t: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
     all_tensors = torch.cat(all_tensors, dim=0)
     return all_tensors
 
-# Patching TorchMetrics LanguageCrossEntropy for MBed
-class MBedLanguageCrossEntropy(LanguageCrossEntropy):
-    def update(self, output, target) -> None:
-        # accumulate loss over all batches
-        self.sum_loss += output['loss']
 
 # Inspiration from: https://github.com/microsoft/unilm/blob/b60c741f746877293bb85eed6806736fc8fa0ffd/simlm/src/models/biencoder_model.py#L103
 class ComposerMBed(HuggingFaceModel):
@@ -84,17 +79,10 @@ class ComposerMBed(HuggingFaceModel):
         
         model = BertModel(config, add_pooling_layer=True)
         
-        metrics = [
-            MBedLanguageCrossEntropy(ignore_index=-100),
-        ]
-        
         super().__init__(model=model,
                          tokenizer=tokenizer,
-                         metrics=metrics,
+                         metrics=[],
                          use_logits=True)
-
-    def eval_forward(self, batch, outputs: Optional[Any] = None):
-        return outputs
 
     def forward(self, batch):
         scores, labels = self._compute_scores(batch)
