@@ -92,6 +92,11 @@ class ComposerMBed(HuggingFaceModel):
         
         loss = loss_fct(scores, labels)
         
+        # Based on https://github.com/microsoft/unilm/blob/b60c741f746877293bb85eed6806736fc8fa0ffd/simlm/src/models/biencoder_model.py#L60C62-L60C62
+        # We are scaling the loss by the world size because we think it will be divided by the world size in the backward pass
+        # This is a hacky way of getting around implementing our own backward pass
+        loss *= dist.get_world_size()
+        
         return {
             'loss': loss,
             'logits': scores, # This doesn't seem right, but needs to be here for torchmetrics
