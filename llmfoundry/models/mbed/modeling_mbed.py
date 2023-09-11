@@ -168,13 +168,11 @@ class ComposerMBed(HuggingFaceModel):
         all_scores, all_labels = self.full_contrastive_scores_and_labels(queries=all_q_pooled_outputs, 
                                                                          passages=all_p_pooled_outputs)
         
-        # scale = 1 / 0.2 # Todo: should be configurable when L2 normalizing, 0.2 should be a temperature arugment
+        scale = 1 / 0.2 # Todo: should be configurable when L2 normalizing, 0.2 should be a temperature arugment
         
-        # all_scores = all_scores * scale
+        all_scores = all_scores * scale
         
         start = dist.get_global_rank() * q_pooled_outputs.shape[0]
-        # start = all_q_pooled_outputs.shape[0]
-        # start = 0
         
         local_query_indices = torch.arange(start, start + q_pooled_outputs.shape[0], dtype=torch.long).to(q_pooled_outputs.device)
         
