@@ -55,6 +55,12 @@ def dist_gather_tensor(t: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
     all_tensors = torch.cat(all_tensors, dim=0)
     return all_tensors
 
+# Patching TorchMetrics LanguageCrossEntropy for MBed
+class MBedLanguageCrossEntropy(LanguageCrossEntropy):
+    def update(self, output, target) -> None:
+        # accumulate loss over all batches
+        self.sum_loss += output['loss']
+
 # Inspiration from: https://github.com/microsoft/unilm/blob/b60c741f746877293bb85eed6806736fc8fa0ffd/simlm/src/models/biencoder_model.py#L103
 class ComposerMBed(HuggingFaceModel):
     """Mosaic MBed model based on |:hugging_face:| Transformers."""
@@ -78,14 +84,17 @@ class ComposerMBed(HuggingFaceModel):
         
         model = BertModel(config, add_pooling_layer=True)
         
-        # metrics = [
-        #     LanguageCrossEntropy(ignore_index=-100),
-        # ]
+        metrics = [
+            MBedLanguageCrossEntropy(ignore_index=-100),
+        ]
         
         super().__init__(model=model,
-                         tokenizer=tokenizer)
-                         #use_logits=True,
-                         #metrics=metrics)
+                         tokenizer=tokenizer,
+                         metrics=metrics,
+                         use_logits=True)
+
+    def eval_forward(self, batch, outputs: Optional[Any] = None):
+        return outputs
 
     def forward(self, batch):
         scores, labels = self._compute_scores(batch)
@@ -97,7 +106,8 @@ class ComposerMBed(HuggingFaceModel):
         
         return {
             'loss': loss,
-            'logits': scores # shouldn't this be scores @cojennin?
+            'logits': scores, # This doesn't seem right, but needs to be here for torchmetrics
+            'labels': labels
         }
 
     # FSDP Wrap function
@@ -107,6 +117,20 @@ class ComposerMBed(HuggingFaceModel):
     # Activation Checkpointing
     def activation_checkpointing_fn(self, module: nn.Module):
         return isinstance(module, BertLayer)
+    
+    def format_queries_batch(self, batch):
+        queries = {}
+        for key in batch.keys():
+            queries[key] = batch[key][0::2,:]
+        
+        return queries
+    
+    def format_passages_batch(self, batch):
+        passages = {}
+        for key in batch.keys():
+            passages[key] = batch[key][1::2,:]
+        
+        return passages
         
     def _compute_scores(self, batch) -> Tuple:
 
@@ -118,23 +142,23 @@ class ComposerMBed(HuggingFaceModel):
         # Note: at some future point we could use the flag 'token_type_ids' which was used in the original
         # BERT formula to keep track of sentences A and sentences B in the next sentence prediction objective
         # function. For now we split even and odd rows
-        queries = batch['input_ids'][0::2,:]
-        passages = batch['input_ids'][1::2,:]
+        queries_batch = self.format_queries_batch(batch)
+        passages_batch = self.format_passages_batch(batch)
 
         (_, q_pooled_outputs) = self.model(
-                                        input_ids=queries,
-                                        token_type_ids=batch.get('token_type_ids', None),
-                                        attention_mask=batch.get('attention_mask', None),
-                                        position_ids=batch.get('position_ids', None),
-                                        masked_tokens_mask=batch.get('masked_tokens_mask', None),
+                                        input_ids=queries_batch['input_ids'],
+                                        token_type_ids=queries_batch.get('token_type_ids', None),
+                                        attention_mask=queries_batch.get('attention_mask', None),
+                                        position_ids=queries_batch.get('position_ids', None),
+                                        masked_tokens_mask=queries_batch.get('masked_tokens_mask', None),
                                     )
 
         (_, p_pooled_outputs) = self.model(
-                                        input_ids=passages,
-                                        token_type_ids=batch.get('token_type_ids', None),
-                                        attention_mask=batch.get('attention_mask', None),
-                                        position_ids=batch.get('position_ids', None),
-                                        masked_tokens_mask=batch.get('masked_tokens_mask', None),
+                                        input_ids=passages_batch['input_ids'],
+                                        token_type_ids=passages_batch.get('token_type_ids', None),
+                                        attention_mask=passages_batch.get('attention_mask', None),
+                                        position_ids=passages_batch.get('position_ids', None),
+                                        masked_tokens_mask=passages_batch.get('masked_tokens_mask', None),
                                     )
 
         #print('>>p_pooled_outputs shape:',p_pooled_outputs.shape)
