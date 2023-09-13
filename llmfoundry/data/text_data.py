@@ -154,7 +154,7 @@ class StreamingTextDataset(StreamingDataset):
     # How to process a sample
     def __getitem__(self, idx: int):
         sample = super().__getitem__(idx)
-        print(sample)
+
         if 'text' in sample:
             token_sample = self._tokenize(sample)
         elif 'tokens' in sample:
