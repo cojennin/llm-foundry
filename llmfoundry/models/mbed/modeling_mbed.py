@@ -79,7 +79,7 @@ class ComposerMBed(HuggingFaceModel):
         config = BertConfig.from_pretrained(pretrained_model_name,
                                             **resolved_om_model_config)
         
-        model = BertModel(config, add_pooling_layer=True)
+        model = BertModel(config, add_pooling_layer=False)
         
         super().__init__(model=model,
                          tokenizer=tokenizer,
@@ -139,8 +139,12 @@ class ComposerMBed(HuggingFaceModel):
         # function. For now we split even and odd rows
         queries_batch = self.format_queries_batch(batch)
         passages_batch = self.format_passages_batch(batch)
+        
+        
+        # print(self.tokenizer.decode(queries_batch['input_ids'][0]))
+        # print(self.tokenizer.decode(passages_batch['input_ids'][0]))
 
-        (_, q_pooled_outputs) = self.model(
+        (q_encoder_outputs, _) = self.model(
                                         input_ids=queries_batch['input_ids'],
                                         token_type_ids=queries_batch.get('token_type_ids', None),
                                         attention_mask=queries_batch.get('attention_mask', None),
@@ -148,7 +152,7 @@ class ComposerMBed(HuggingFaceModel):
                                         masked_tokens_mask=queries_batch.get('masked_tokens_mask', None),
                                     )
 
-        (_, p_pooled_outputs) = self.model(
+        (p_encoder_outputs, _) = self.model(
                                         input_ids=passages_batch['input_ids'],
                                         token_type_ids=passages_batch.get('token_type_ids', None),
                                         attention_mask=passages_batch.get('attention_mask', None),
@@ -156,6 +160,12 @@ class ComposerMBed(HuggingFaceModel):
                                         masked_tokens_mask=passages_batch.get('masked_tokens_mask', None),
                                     )
 
+        q_last_hidden = q_encoder_outputs.masked_fill(~queries_batch.get('attention_mask', None)[..., None].bool(), 0.0)
+        q_pooled_outputs = q_last_hidden.sum(dim=1) / queries_batch.get('attention_mask', None).sum(dim=1)[..., None]
+        
+        p_last_hidden = p_encoder_outputs.masked_fill(~passages_batch.get('attention_mask', None)[..., None].bool(), 0.0)
+        p_pooled_outputs = p_last_hidden.sum(dim=1) / passages_batch.get('attention_mask', None).sum(dim=1)[..., None]
+        
         #print('>>p_pooled_outputs shape:',p_pooled_outputs.shape)
         
         q_pooled_outputs = F.normalize(q_pooled_outputs, dim=-1) # Todo: should be configurable when L2 normalizing
