@@ -176,6 +176,8 @@ class ComposerMBed(HuggingFaceModel):
 
         # all_q_pooled_outputs = dist_gather_tensor(q_pooled_outputs)
         # all_p_pooled_outputs = dist_gather_tensor(p_pooled_outputs)
+        all_q_pooled_outputs = q_pooled_outputs
+        all_p_pooled_outputs = p_pooled_outputs
         
         all_scores, all_labels = self.full_contrastive_scores_and_labels(queries=all_q_pooled_outputs, 
                                                                          passages=all_p_pooled_outputs)
