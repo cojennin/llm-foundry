@@ -79,12 +79,14 @@ class ComposerMBed(HuggingFaceModel):
         config = BertConfig.from_pretrained(pretrained_model_name,
                                             **resolved_om_model_config)
         
-        model = BertModel(config, add_pooling_layer=True)
+        model = BertModel(config, add_pooling_layer=False)
         
         super().__init__(model=model,
                          tokenizer=tokenizer,
                          metrics=[],
                          use_logits=True)
+                
+        self.pooler = nn.Linear(model.config.hidden_size, 768)
 
     def forward(self, batch):
         scores, labels = self._compute_scores(batch)
@@ -140,15 +142,16 @@ class ComposerMBed(HuggingFaceModel):
         queries_batch = self.format_queries_batch(batch)
         passages_batch = self.format_passages_batch(batch)
 
-        (_, q_pooled_outputs) = self.model(
+        (q_outputs, q_pooled_outputs) = self.model(
                                         input_ids=queries_batch['input_ids'],
                                         token_type_ids=queries_batch.get('token_type_ids', None),
                                         attention_mask=queries_batch.get('attention_mask', None),
                                         position_ids=queries_batch.get('position_ids', None),
                                         masked_tokens_mask=queries_batch.get('masked_tokens_mask', None),
                                     )
+        
 
-        (_, p_pooled_outputs) = self.model(
+        (p_outputs, p_pooled_outputs) = self.model(
                                         input_ids=passages_batch['input_ids'],
                                         token_type_ids=passages_batch.get('token_type_ids', None),
                                         attention_mask=passages_batch.get('attention_mask', None),
@@ -156,7 +159,14 @@ class ComposerMBed(HuggingFaceModel):
                                         masked_tokens_mask=passages_batch.get('masked_tokens_mask', None),
                                     )
 
+        
+        embeds = q_outputs[:, 0]
+        q_pooled_outputs = self.pooler(embeds)
+        
+        embeds = p_outputs[:, 0]
+        p_pooled_outputs = self.pooler(embeds)
         #print('>>p_pooled_outputs shape:',p_pooled_outputs.shape)
+
         
         q_pooled_outputs = F.normalize(q_pooled_outputs, dim=-1) # Todo: should be configurable when L2 normalizing
         p_pooled_outputs = F.normalize(p_pooled_outputs, dim=-1)

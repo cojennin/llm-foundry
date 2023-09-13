@@ -154,7 +154,7 @@ class StreamingPairsDataset(StreamingDataset):
     # How to process a sample
     def __getitem__(self, idx: int):
         sample = super().__getitem__(idx)
-        
+
         text_samples = [sample[item] for item in sample if item.startswith("text_")]
         
         if len(text_samples) == 0:
