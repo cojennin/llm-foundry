@@ -174,8 +174,8 @@ class ComposerMBed(HuggingFaceModel):
         q_pooled_outputs = q_pooled_outputs.contiguous() # Why do we need to make this contiguous?
         p_pooled_outputs = p_pooled_outputs.contiguous() # Why do we need to make this contiguous?
 
-        all_q_pooled_outputs = dist_gather_tensor(q_pooled_outputs)
-        all_p_pooled_outputs = dist_gather_tensor(p_pooled_outputs)
+        # all_q_pooled_outputs = dist_gather_tensor(q_pooled_outputs)
+        # all_p_pooled_outputs = dist_gather_tensor(p_pooled_outputs)
         
         all_scores, all_labels = self.full_contrastive_scores_and_labels(queries=all_q_pooled_outputs, 
                                                                          passages=all_p_pooled_outputs)
@@ -184,12 +184,14 @@ class ComposerMBed(HuggingFaceModel):
         
         all_scores = all_scores * scale
         
-        start = dist.get_global_rank() * q_pooled_outputs.shape[0]
+        # start = dist.get_global_rank() * q_pooled_outputs.shape[0]
         
-        local_query_indices = torch.arange(start, start + q_pooled_outputs.shape[0], dtype=torch.long).to(q_pooled_outputs.device)
+        # local_query_indices = torch.arange(start, start + q_pooled_outputs.shape[0], dtype=torch.long).to(q_pooled_outputs.device)
         
-        scores = all_scores.index_select(dim=0, index=local_query_indices)
-        labels = all_labels.index_select(dim=0, index=local_query_indices)
+        # scores = all_scores.index_select(dim=0, index=local_query_indices)
+        # labels = all_labels.index_select(dim=0, index=local_query_indices)s
+        scores = all_scores
+        labels = all_labels
         #print('>>labels',labels.shape) # should be torch.Size([64])
         return scores, labels
 
