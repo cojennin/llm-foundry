@@ -195,6 +195,9 @@ class ComposerMBed(HuggingFaceModel):
         scores = all_scores
         labels = all_labels
         #print('>>labels',labels.shape) # should be torch.Size([64])
+
+        print('>> mean scores',all_scores.mean())
+        print('>> mean diagonal scores', all_scores.diagonal().mean())
         return scores, labels
 
     def full_contrastive_scores_and_labels(self, queries: torch.Tensor, passages: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
