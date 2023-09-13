@@ -147,7 +147,7 @@ class ComposerMBed(HuggingFaceModel):
                                         token_type_ids=queries_batch.get('token_type_ids', None),
                                         attention_mask=queries_batch.get('attention_mask', None),
                                         position_ids=queries_batch.get('position_ids', None),
-                                        masked_tokens_mask=queries_batch.get('masked_tokens_mask', None),
+                                        masked_tokens_mask=queries_batch.get('masked_tokens_mask', None)
                                     )
         
 
@@ -156,20 +156,20 @@ class ComposerMBed(HuggingFaceModel):
                                         token_type_ids=passages_batch.get('token_type_ids', None),
                                         attention_mask=passages_batch.get('attention_mask', None),
                                         position_ids=passages_batch.get('position_ids', None),
-                                        masked_tokens_mask=passages_batch.get('masked_tokens_mask', None),
+                                        masked_tokens_mask=passages_batch.get('masked_tokens_mask', None)
                                     )
 
         
-        embeds = q_outputs[:, 0]
-        q_pooled_outputs = self.pooler(embeds)
+        q_embeds = q_outputs[:, 0]
+        # q_pooled_outputs = self.pooler(embeds)
         
-        embeds = p_outputs[:, 0]
-        p_pooled_outputs = self.pooler(embeds)
+        p_embeds = p_outputs[:, 0]
+        # p_pooled_outputs = self.pooler(embeds)
         #print('>>p_pooled_outputs shape:',p_pooled_outputs.shape)
 
         
-        q_pooled_outputs = F.normalize(q_pooled_outputs, dim=-1) # Todo: should be configurable when L2 normalizing
-        p_pooled_outputs = F.normalize(p_pooled_outputs, dim=-1)
+        q_pooled_outputs = F.normalize(q_embeds, dim=-1) # Todo: should be configurable when L2 normalizing
+        p_pooled_outputs = F.normalize(p_embeds, dim=-1)
 
         q_pooled_outputs = q_pooled_outputs.contiguous() # Why do we need to make this contiguous?
         p_pooled_outputs = p_pooled_outputs.contiguous() # Why do we need to make this contiguous?
