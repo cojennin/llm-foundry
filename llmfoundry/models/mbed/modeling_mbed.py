@@ -97,7 +97,7 @@ class ComposerMBed(HuggingFaceModel):
         # Based on https://github.com/microsoft/unilm/blob/b60c741f746877293bb85eed6806736fc8fa0ffd/simlm/src/models/biencoder_model.py#L60C62-L60C62
         # We are scaling the loss by the world size because we think it will be divided by the world size in the backward pass
         # This is a hacky way of getting around implementing our own backward pass
-        loss *= dist.get_world_size()
+        # loss *= dist.get_world_size()
         
         return {
             'loss': loss,
@@ -180,7 +180,7 @@ class ComposerMBed(HuggingFaceModel):
         all_scores, all_labels = self.full_contrastive_scores_and_labels(queries=all_q_pooled_outputs, 
                                                                          passages=all_p_pooled_outputs)
         
-        scale = 1 / self.temperature # Todo: should be configurable when L2 normalizing, 0.2 should be a temperature arugment
+        scale = 1 / self.temperature
         
         all_scores = all_scores * scale
         
