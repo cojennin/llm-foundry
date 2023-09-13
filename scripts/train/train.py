@@ -17,7 +17,7 @@ from transformers import PreTrainedTokenizerBase
 
 from llmfoundry import (COMPOSER_MODEL_REGISTRY, ComposerHFCausalLM,
                         MPTForCausalLM, build_finetuning_dataloader,
-                        build_text_denoising_dataloader)
+                        build_pairs_dataloader, build_text_denoising_dataloader)
 from llmfoundry.data.text_data import build_text_dataloader
 from llmfoundry.utils.builders import (build_algorithm, build_callback,
                                        build_icl_data_and_gauntlet,
@@ -172,6 +172,9 @@ def build_dataloader(cfg: DictConfig, tokenizer: PreTrainedTokenizerBase,
             tokenizer,
             device_batch_size,
         )
+    elif cfg.name == 'pairs':
+        return build_pairs_dataloader(cfg, tokenizer, 
+                                        device_batch_size)
     else:
         raise ValueError(f'Not sure how to build dataloader with config: {cfg}')
 

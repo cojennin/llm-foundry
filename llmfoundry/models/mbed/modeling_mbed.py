@@ -116,14 +116,14 @@ class ComposerMBed(HuggingFaceModel):
     def format_queries_batch(self, batch):
         queries = {}
         for key in batch.keys():
-            queries[key] = batch[key][0::2,:]
+            queries[key] = batch[key][:,0::2,:].reshape(batch[key].size(0), -1)
         
         return queries
     
     def format_passages_batch(self, batch):
         passages = {}
         for key in batch.keys():
-            passages[key] = batch[key][1::2,:]
+            passages[key] = batch[key][:,1::2,:].reshape(batch[key].size(0), -1)
         
         return passages
         

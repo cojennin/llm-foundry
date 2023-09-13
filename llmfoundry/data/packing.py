@@ -264,7 +264,8 @@ if __name__ == '__main__':
     from omegaconf import OmegaConf as om
 
     from llmfoundry import (build_finetuning_dataloader,
-                            build_text_denoising_dataloader)
+                            build_text_denoising_dataloader,
+                            build_pairs_dataloader)
     from llmfoundry.data import build_text_dataloader
     from llmfoundry.utils import build_tokenizer
 
@@ -324,6 +325,9 @@ if __name__ == '__main__':
         elif cfg.name == 'finetuning':
             return build_finetuning_dataloader(cfg, tokenizer,
                                                device_batch_size)
+        elif cfg.name == 'pairs':
+            return build_pairs_dataloader(cfg, tokenizer, 
+                                          device_batch_size)
         else:
             raise ValueError(
                 f'Not sure how to build dataloader with config: {cfg}')

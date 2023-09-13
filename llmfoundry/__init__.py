@@ -9,6 +9,7 @@ try:
                                  MixtureOfDenoisersCollator, NoConcatDataset,
                                  Seq2SeqFinetuningCollator,
                                  build_finetuning_dataloader,
+                                 build_pairs_dataloader,
                                  build_text_denoising_dataloader)
     from llmfoundry.models.hf import (ComposerHFCausalLM, ComposerHFPrefixLM,
                                       ComposerHFT5)
@@ -38,6 +39,7 @@ except ImportError as e:
 __all__ = [
     'build_text_denoising_dataloader',
     'build_finetuning_dataloader',
+    'build_pairs_dataloader',
     'MixtureOfDenoisersCollator',
     'Seq2SeqFinetuningCollator',
     'MPTBlock',
