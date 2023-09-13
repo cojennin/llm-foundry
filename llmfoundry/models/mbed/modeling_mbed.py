@@ -86,7 +86,7 @@ class ComposerMBed(HuggingFaceModel):
                          metrics=[],
                          use_logits=True)
                 
-        self.pooler = nn.Linear(model.config.hidden_size, 768)
+        # self.pooler = nn.Linear(model.config.hidden_size, 768)
 
     def forward(self, batch):
         scores, labels = self._compute_scores(batch)
