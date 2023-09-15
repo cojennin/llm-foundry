@@ -174,10 +174,10 @@ class ComposerMBed(HuggingFaceModel):
         q_pooled_outputs = q_pooled_outputs.contiguous() # Why do we need to make this contiguous?
         p_pooled_outputs = p_pooled_outputs.contiguous() # Why do we need to make this contiguous?
 
-        # all_q_pooled_outputs = dist_gather_tensor(q_pooled_outputs)
-        # all_p_pooled_outputs = dist_gather_tensor(p_pooled_outputs)
-        all_q_pooled_outputs = q_pooled_outputs
-        all_p_pooled_outputs = p_pooled_outputs
+        all_q_pooled_outputs = dist_gather_tensor(q_pooled_outputs)
+        all_p_pooled_outputs = dist_gather_tensor(p_pooled_outputs)
+        # all_q_pooled_outputs = q_pooled_outputs
+        # all_p_pooled_outputs = p_pooled_outputs
         
         all_scores, all_labels = self.full_contrastive_scores_and_labels(queries=all_q_pooled_outputs, 
                                                                          passages=all_p_pooled_outputs)
@@ -191,14 +191,15 @@ class ComposerMBed(HuggingFaceModel):
         # local_query_indices = torch.arange(start, start + q_pooled_outputs.shape[0], dtype=torch.long).to(q_pooled_outputs.device)
         
         # scores = all_scores.index_select(dim=0, index=local_query_indices)
+        # all_scores[dist.get_global_rank()] = scores
         # labels = all_labels.index_select(dim=0, index=local_query_indices)s
-        scores = all_scores
-        labels = all_labels
+        # scores = all_scores
+        # labels = all_labels
         #print('>>labels',labels.shape) # should be torch.Size([64])
 
         print('>> mean scores',all_scores.mean())
         print('>> mean diagonal scores', all_scores.diagonal().mean())
-        return scores, labels
+        return all_scores, all_labels
 
     def full_contrastive_scores_and_labels(self, queries: torch.Tensor, passages: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
 
