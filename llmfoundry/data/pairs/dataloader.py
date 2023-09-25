@@ -90,6 +90,10 @@ class StreamingPairsDataset(StreamingDataset):
                  shuffle_block_size: int = 1 << 18,
                  **kwargs: Any):
 
+        # Use EOS as the pad token if none exists
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+
         group_method = kwargs.pop('group_method', None)
         if group_method is not None:
             raise NotImplementedError(
