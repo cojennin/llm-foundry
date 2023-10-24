@@ -15,6 +15,9 @@ from omegaconf import OmegaConf as om
 from streaming import Stream, StreamingDataset
 from torch.utils.data import DataLoader
 from transformers import PreTrainedTokenizerBase
+import logging
+
+log = logging.getLogger(__name__)
 
 
 class StreamingPairsDataset(StreamingDataset):
@@ -157,6 +160,7 @@ class StreamingPairsDataset(StreamingDataset):
 
     # How to process a sample
     def __getitem__(self, idx: int):
+        log.info(f'__getitem__ index {idx}')
         sample = super().__getitem__(idx)
 
         text_samples = [sample[item] for item in sample if item.startswith("text_")]

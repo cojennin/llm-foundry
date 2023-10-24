@@ -87,6 +87,7 @@ class ComposerMBed(HuggingFaceModel):
                          use_logits=True)
 
     def forward(self, batch):
+        import pdb; pdb.set_trace()
         scores, labels = self._compute_scores(batch)
         #self.labels = labels # added for eval, doesn't work
         
