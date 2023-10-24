@@ -33,7 +33,7 @@ except ImportError as e:
         is_cuda_available = False
 
     extras = '.[gpu]' if is_cuda_available else '.'
-    print(e)
+
     raise ImportError(
         f'Please make sure to pip install {extras} to get the requirements for the LLM example.'
     ) from e
