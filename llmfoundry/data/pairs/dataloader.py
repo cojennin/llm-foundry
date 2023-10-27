@@ -92,6 +92,9 @@ class StreamingPairsDataset(StreamingDataset):
         # Use EOS as the pad token if none exists
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
+            
+        if tokenizer.mask_token is None:
+            tokenizer.mask_token = "[MASK]" ### THIS IS A HACK!!!!
 
         group_method = kwargs.pop('group_method', None)
         if group_method is not None:
