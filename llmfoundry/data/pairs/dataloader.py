@@ -87,6 +87,9 @@ class StreamingPairsDataset(StreamingDataset):
                  shuffle_algo: str = 'py1b',
                  shuffle_seed: int = 9176,
                  shuffle_block_size: int = 1 << 18,
+                 sampling_method: str = 'balanced',
+                 sampling_granularity: int = 1,
+                 batching_method: str = 'random',
                  **kwargs: Any):
 
         # Use EOS as the pad token if none exists
@@ -136,6 +139,9 @@ class StreamingPairsDataset(StreamingDataset):
             shuffle_algo=shuffle_algo,
             shuffle_seed=shuffle_seed,
             shuffle_block_size=shuffle_block_size,
+            sampling_method=sampling_method,
+            sampling_granularity=sampling_granularity,
+            batching_method=batching_method,
         )
         self.tokenizer = tokenizer
         self.max_seq_len = max_seq_len
