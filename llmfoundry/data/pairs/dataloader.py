@@ -204,6 +204,7 @@ def build_pairs_dataloader(
     dataset = StreamingPairsDataset(
         tokenizer=tokenizer,
         streams=streams,
+        batch_size=device_batch_size,
         **cfg.dataset,
     )
 
