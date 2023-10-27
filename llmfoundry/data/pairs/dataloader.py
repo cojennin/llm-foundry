@@ -118,6 +118,9 @@ class StreamingPairsDataset(StreamingDataset):
                     raise ValueError(
                         f'local directory {local} does not contain split {split}'
                     )
+        
+        if isinstance(shuffle_block_size, float):
+            shuffle_block_size = int(shuffle_block_size)
 
         # Build Dataset
         super().__init__(
