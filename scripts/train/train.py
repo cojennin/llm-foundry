@@ -627,7 +627,13 @@ def main(cfg: DictConfig) -> Trainer:
         trainer.eval()
 
     log.info('Starting training...')
-    trainer.fit()
+    
+    fit_config = {}
+    if cfg.get('fit_config', None):
+        fit_config = om.to_object(cfg.get('fit_config'))
+        
+    
+    trainer.fit(**fit_config)
 
     log.info('Done.')
     return trainer
